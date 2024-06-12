@@ -193,7 +193,7 @@ def load_checkpoint_jsonl(filename):
 checkpoint_path = str(RESULT_DIR/"checkpoint.jsonl")
 
 def evolutionary_algorithm(rob, start_position, start_orientation, target_position,
-                           generations=4, population_size=3,
+                           generations=100, population_size=25,
                            checkpoint_file=checkpoint_path, continue_from_checkpoint=True,
                            steps=20):
 
@@ -222,7 +222,8 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
     for generation in range(generation_start, generations):
         fitnesses = [fitness(individual, rob, start_position, start_orientation, target_position, controller, steps) for individual in population]
         
-        num_parents = 2
+        # num_parents = 2
+        num_parents = max(2, population_size // 10)  # Calculate 10% of population size, ensuring at least 2 parent
         parents = selection(population, fitnesses, num_parents)
 
         new_population = []
