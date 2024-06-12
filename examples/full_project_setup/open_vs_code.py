@@ -1,8 +1,8 @@
-cd "C:\Users\Mohammed\Desktop\learning_machines"
+cd "C:\Users\moham\Desktop\learningMachines"
 
-envLearningMachine\Scripts\activate
+.\envLearningMachine\Scripts\activate
 
-cd "C:\Users\Mohammed\Desktop\learning_machines\learningMachines\examples\full_project_setup"
+cd "C:\Users\moham\Desktop\learningMachines\examples\full_project_setup"
 
 
 

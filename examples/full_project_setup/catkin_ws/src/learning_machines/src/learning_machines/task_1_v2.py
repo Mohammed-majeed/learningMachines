@@ -2,9 +2,12 @@ import numpy as np
 import math
 import time
 import random
-import pickle
+import json
 import os
 from scipy import stats
+
+from data_files import RESULT_DIR
+
 from robobo_interface import (
     IRobobo,
     Emotion,
@@ -87,15 +90,15 @@ def read_irs_sensors(rob, num_reads=7):
 
 def move_forward(rob, speed, duration):
     rob.move_blocking(left_speed=speed, right_speed=speed, millis=duration)
-    time.sleep(duration/1000)
+    # time.sleep(duration/1000)
 
 def turn_left(rob, speed, duration):
     rob.move_blocking(left_speed=-speed, right_speed=speed, millis=duration)
-    time.sleep(duration/1000)
+    # time.sleep(duration/1000)
 
 def turn_right(rob, speed, duration):
     rob.move_blocking(left_speed=speed, right_speed=-speed, millis=duration)
-    time.sleep(duration/1000)
+    # time.sleep(duration/1000)
 
 def fitness(individual, rob, start_position, start_orientation, target_position, controller, steps):
     rob.set_position(start_position, start_orientation)  # Reset robot's position at the start of each evaluation
@@ -107,10 +110,10 @@ def fitness(individual, rob, start_position, start_orientation, target_position,
 
     for _ in range(steps):  # 20 steps for evaluation
         sensor_dict = read_irs_sensors(rob)
-        print('sensor_dict', sensor_dict)
+        # print('sensor_dict', sensor_dict)
         sensor_inputs = list(sensor_dict.values())
         action = controller.control(sensor_inputs, individual)
-        print('action', action)
+        # print('action', action)
 
         if action == "move_forward":
             move_forward(rob, speed=50, duration=500)
@@ -130,6 +133,7 @@ def fitness(individual, rob, start_position, start_orientation, target_position,
                               (current_position.y - target_position.y) ** 2) ** 0.5
         
     fit = -distance_to_target - (collisions * 10)  # Negative because we want to minimize this value
+    print("fit",fit)
     return fit
 
 def initialize_population(size, n_weights):
@@ -153,39 +157,63 @@ def mutate(individual, mutation_rate=0.1):
             individual[i] += np.random.normal()
     return individual
 
-def save_checkpoint(population, fitnesses, best_individual, generation, filename='checkpoint.pkl'):
-    with open(filename, 'wb') as f:
-        pickle.dump({
-            'population': population,
+def save_checkpoint_jsonl(population, fitnesses, best_individual, generation, filename):
+    try:
+        checkpoint = {
+            'generation': generation,
             'fitnesses': fitnesses,
-            'best_individual': best_individual,
-            'generation': generation
-        }, f)
+            'best_individual': best_individual.tolist(),
+            'population': [ind.tolist() for ind in population]
+        }
+        with open(filename, 'a') as f:  # Open in append mode
+            f.write(json.dumps(checkpoint) + '\n')
+        print(f"Checkpoint saved successfully at generation {generation}")
+    except Exception as e:
+        print(f"Error saving checkpoint: {e}")
 
-def load_checkpoint(filename='checkpoint.pkl'):
-    with open(filename, 'rb') as f:
-        checkpoint = pickle.load(f)
-    return checkpoint
+
+def load_checkpoint_jsonl(filename):
+    try:
+        with open(filename, 'r') as f:
+            last_line = None
+            for last_line in f:  # Read the last line
+                pass
+            if last_line is None:
+                raise ValueError("Checkpoint file is empty")
+            checkpoint = json.loads(last_line)
+            checkpoint['population'] = [np.array(ind) for ind in checkpoint['population']]
+            checkpoint['best_individual'] = np.array(checkpoint['best_individual'])
+            print(f"Checkpoint loaded successfully for generation {checkpoint['generation']}")
+            return checkpoint
+    except Exception as e:
+        print(f"Error loading checkpoint: {e}")
+        return None
+    
+
+checkpoint_path = str(RESULT_DIR/"checkpoint.jsonl")
 
 def evolutionary_algorithm(rob, start_position, start_orientation, target_position,
-                            generations=100, population_size=20,
-                            checkpoint_file='checkpoint.pkl', continue_from_checkpoint=False,
-                            steps=20):
-    
+                           generations=4, population_size=3,
+                           checkpoint_file=checkpoint_path, continue_from_checkpoint=True,
+                           steps=20):
+
     n_hidden = 1
     n_inputs = 5  # Number of sensors
     n_outputs = 3  # Number of actions
     n_weights = n_inputs * n_hidden + n_hidden * n_outputs + n_hidden + n_outputs
 
-    print('n_weights', n_weights)
-
     controller = robot_controller(n_hidden)
     
     if continue_from_checkpoint:
-        checkpoint = load_checkpoint(checkpoint_file)
-        population = checkpoint['population']
-        generation_start = checkpoint['generation'] + 1
-        best_individual = checkpoint['best_individual']
+        checkpoint = load_checkpoint_jsonl(checkpoint_file)
+        if checkpoint:
+            population = checkpoint['population']
+            generation_start = checkpoint['generation'] + 1
+            best_individual = checkpoint['best_individual']
+        else:
+            population = initialize_population(population_size, n_weights)
+            generation_start = 0
+            best_individual = None
     else:
         population = initialize_population(population_size, n_weights)
         generation_start = 0
@@ -194,7 +222,7 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
     for generation in range(generation_start, generations):
         fitnesses = [fitness(individual, rob, start_position, start_orientation, target_position, controller, steps) for individual in population]
         
-        num_parents = max(1, population_size // 10)
+        num_parents = 2
         parents = selection(population, fitnesses, num_parents)
 
         new_population = []
@@ -208,7 +236,7 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
 
         best_individual_index = fitnesses.index(max(fitnesses))
         best_individual = population[best_individual_index]
-        save_checkpoint(population, fitnesses, best_individual, generation, checkpoint_file)
+        save_checkpoint_jsonl(population, fitnesses, best_individual, generation, checkpoint_file)
 
         best_fitness = max(fitnesses)
         print(f"Generation {generation}: Best Fitness = {best_fitness}")

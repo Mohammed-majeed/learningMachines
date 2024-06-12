@@ -133,8 +133,8 @@ def run_all_actions(rob: IRobobo):
 
 
 
-    # if isinstance(rob, SimulationRobobo):
-    #     test_sim(rob)
+    if isinstance(rob, SimulationRobobo):
+        test_sim(rob)
 
     if isinstance(rob, HardwareRobobo):
         test_hardware(rob)
