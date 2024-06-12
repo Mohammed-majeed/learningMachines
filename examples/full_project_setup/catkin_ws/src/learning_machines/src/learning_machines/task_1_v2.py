@@ -159,9 +159,11 @@ def mutate(individual, mutation_rate=0.1):
 
 def save_checkpoint_jsonl(population, fitnesses, best_individual, generation, filename):
     try:
+        best_fitness = max(fitnesses)  # Calculate the best fitness
         checkpoint = {
             'generation': generation,
             'fitnesses': fitnesses,
+            'best_fitness': best_fitness,  # Save the best fitness
             'best_individual': best_individual.tolist(),
             'population': [ind.tolist() for ind in population]
         }
@@ -170,6 +172,7 @@ def save_checkpoint_jsonl(population, fitnesses, best_individual, generation, fi
         print(f"Checkpoint saved successfully at generation {generation}")
     except Exception as e:
         print(f"Error saving checkpoint: {e}")
+
 
 
 def load_checkpoint_jsonl(filename):
@@ -222,8 +225,7 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
     for generation in range(generation_start, generations):
         fitnesses = [fitness(individual, rob, start_position, start_orientation, target_position, controller, steps) for individual in population]
         
-        # num_parents = 2
-        num_parents = max(2, population_size // 10)  # Calculate 10% of population size, ensuring at least 2 parent
+        num_parents = max(2, population_size // 10)  # Calculate 10% of population size, ensuring at least 2 parents
         parents = selection(population, fitnesses, num_parents)
 
         new_population = []
