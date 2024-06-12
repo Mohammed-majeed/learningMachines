@@ -103,7 +103,7 @@ def test_hardware(rob: HardwareRobobo):
 
 
 
-def run_task(rob):
+def train_task_1(rob):
 
     # start_position = Position(x=0.125, y=0.202, z=0.09)  # Set the starting position
 
@@ -112,10 +112,18 @@ def run_task(rob):
     target_position = Position(x=1.5, y=1.5, z=0.0)  # Set the target position
 
     try:
-        best_path = task_1_v2.evolutionary_algorithm(rob, start_position, start_orientation, target_position)
-        print("Best Path:", best_path)
+        task_1_v2.evolutionary_algorithm(rob, start_position, start_orientation, target_position)
+        print("Done training")
     finally:
         rob.stop_simulation()  # Stop the simulation when done
+
+def test_task_1(rob):
+    start_position = Position(x=0.0, y=0.0, z=0.09)  # Set the starting position
+    start_orientation = Orientation(yaw=-175.00036138789557, pitch=-19.996487020842473, roll=4.820286812070959e-05)  # Set the starting orientation
+    target_position = Position(x=1.5, y=1.5, z=0.0)  # Set the target position
+
+    task_1_v2.test_best_individual(rob, start_position, start_orientation, target_position)
+    print("Done testing")
 
 
 
@@ -126,11 +134,10 @@ def run_all_actions(rob: IRobobo):
 
     # task_0.avoid_obstacle(rob)
     # task_0.touch_wall_backup(rob)
-    # print(rob.read_orientation())
-    # print("\n\nrob.read_orientation()\n\n")
 
-    run_task(rob)
 
+    # train_task_1(rob)
+    test_task_1(rob)
 
 
     if isinstance(rob, SimulationRobobo):

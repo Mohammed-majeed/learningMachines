@@ -194,15 +194,18 @@ def load_checkpoint_jsonl(filename):
     
 
 checkpoint_path = str(RESULT_DIR/"checkpoint.jsonl")
+n_hidden = 1
+n_inputs = 5  # Number of sensors
+n_outputs = 3  # Number of actions
 
 def evolutionary_algorithm(rob, start_position, start_orientation, target_position,
                            generations=100, population_size=25,
                            checkpoint_file=checkpoint_path, continue_from_checkpoint=True,
                            steps=20):
 
-    n_hidden = 1
-    n_inputs = 5  # Number of sensors
-    n_outputs = 3  # Number of actions
+    # n_hidden = 1
+    # n_inputs = 5  # Number of sensors
+    # n_outputs = 3  # Number of actions
     n_weights = n_inputs * n_hidden + n_hidden * n_outputs + n_hidden + n_outputs
 
     controller = robot_controller(n_hidden)
@@ -243,3 +246,62 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
 
         best_fitness = max(fitnesses)
         print(f"Generation {generation}: Best Fitness = {best_fitness}")
+
+
+
+
+###################
+# test best individual 
+
+
+def load_best_individual():
+    try:
+        with open(checkpoint_path, 'r') as f:
+            last_line = None
+            for last_line in f:  # Read the last line
+                pass
+            if last_line is None:
+                raise ValueError("Checkpoint file is empty")
+            checkpoint = json.loads(last_line)
+            best_individual = np.array(checkpoint['best_individual'])
+            print(f"Best individual loaded successfully from generation {checkpoint['generation']}")
+            return best_individual
+    except Exception as e:
+        print(f"Error loading best individual: {e}")
+        return None
+
+def test_best_individual(rob, start_position, start_orientation, target_position, steps=20):
+    controller = robot_controller(n_hidden)
+    best_individual = load_best_individual()
+    controller.set(best_individual, n_inputs)  # Initialize the controller with the best individual weights
+
+    rob.set_position(start_position, start_orientation)  # Reset robot's position at the start of the test
+    distance_to_target = float('inf')
+    threshold = 20
+    collisions = 0
+
+    for _ in range(steps):
+        sensor_dict = read_irs_sensors(rob)
+        sensor_inputs = list(sensor_dict.values())
+        action = controller.control(sensor_inputs, best_individual)
+
+        if action == "move_forward":
+            move_forward(rob, speed=50, duration=500)
+        elif action == "turn_left":
+            turn_left(rob, speed=50, duration=500)
+        elif action == "turn_right":
+            turn_right(rob, speed=50, duration=500)
+
+        sensor_dict = read_irs_sensors(rob)
+        if (sensor_dict["FrontC"] > threshold or
+            sensor_dict["FrontR"] > threshold or
+            sensor_dict["FrontL"] > threshold):
+            collisions += 1
+
+        current_position = rob.get_position()
+        distance_to_target = ((current_position.x - target_position.x) ** 2 +
+                              (current_position.y - target_position.y) ** 2) ** 0.5
+
+    fit = -distance_to_target - (collisions * 10)  # Negative because we want to minimize this value
+    print("Test fit:", fit)
+    return fit
