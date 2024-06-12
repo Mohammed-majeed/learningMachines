@@ -2,7 +2,7 @@ cd "C:\Users\Mohammed\Desktop\learning_machines"
 
 envLearningMachine\Scripts\activate
 
-cd "C:\Users\Mohammed\Desktop\learning_machines\learning_machines_robobo-master\examples\full_project_setup"
+cd "C:\Users\Mohammed\Desktop\learning_machines\learningMachines\examples\full_project_setup"
 
 
 

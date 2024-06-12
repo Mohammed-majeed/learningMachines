@@ -1,13 +1,10 @@
-
-from data_files import FIGRURES_DIR
 import numpy as np
 import math
-from scipy import stats
 import time
 import random
 import pickle
 import os
-
+from scipy import stats
 from robobo_interface import (
     IRobobo,
     Emotion,
@@ -18,6 +15,47 @@ from robobo_interface import (
     HardwareRobobo,
 )
 
+class robot_controller:
+    def __init__(self, _n_hidden):
+        self.n_hidden = [_n_hidden]
+
+    def set(self, controller, n_inputs):
+        if self.n_hidden[0] > 0:
+            self.bias1 = controller[:self.n_hidden[0]].reshape(1, self.n_hidden[0])
+            weights1_slice = n_inputs * self.n_hidden[0] + self.n_hidden[0]
+            self.weights1 = controller[self.n_hidden[0]:weights1_slice].reshape((n_inputs, self.n_hidden[0]))
+            self.bias2 = controller[weights1_slice:weights1_slice + 3].reshape(1, 3)
+            self.weights2 = controller[weights1_slice + 3:].reshape((self.n_hidden[0], 3))
+
+    def control(self, inputs, controller):
+        inputs = np.array(inputs)  # Convert inputs to a NumPy array
+        input_min = min(inputs)
+        input_max = max(inputs)
+        if input_max - input_min != 0:
+            inputs = (inputs - input_min) / float(input_max - input_min)
+        else:
+            inputs = inputs * 0
+
+        if self.n_hidden[0] > 0:
+            output1 = sigmoid_activation(inputs.dot(self.weights1) + self.bias1)
+            output = sigmoid_activation(output1.dot(self.weights2) + self.bias2)[0]
+        else:
+            bias = controller[:3].reshape(1, 3)
+            weights = controller[3:].reshape((len(inputs), 3))
+            output = sigmoid_activation(inputs.dot(weights) + bias)[0]
+
+        if output[0] > 0.5:
+            return 'move_forward'
+        elif output[1] > 0.5:
+            return 'turn_left'
+        elif output[2] > 0.5:
+            return 'turn_right'
+        else:
+            return 'move_forward'
+
+
+def sigmoid_activation(x):
+    return 1. / (1. + np.exp(-x))
 
 def read_irs_sensors(rob, num_reads=7):
     joint_list = ["BackL", "BackR", "FrontL", "FrontR", "FrontC", "FrontRR", "BackC", "FrontLL"]
@@ -36,116 +74,84 @@ def read_irs_sensors(rob, num_reads=7):
         for joint, value in zip(joint_list, irs_data):
             readings[joint].append(value)
     sensor_modes = {joint: stats.mode(values)[0][0] for joint, values in readings.items()}
-    # print(sensor_modes)
-    return sensor_modes
 
-
-
+    front_sensors = {
+        "FrontC": sensor_modes["FrontC"],
+        "FrontR": sensor_modes["FrontR"],
+        "FrontL": sensor_modes["FrontL"],
+        "FrontRR": sensor_modes["FrontRR"],
+        "FrontLL": sensor_modes["FrontLL"]
+    }
+    
+    return front_sensors
 
 def move_forward(rob, speed, duration):
-    """
-    Move the robot forward.
-    """
     rob.move_blocking(left_speed=speed, right_speed=speed, millis=duration)
     time.sleep(duration/1000)
 
-def move_backward(rob, speed, duration):
-    """
-    Move the robot backward.
-    """
-    rob.move_blocking(left_speed=-speed, right_speed=-speed, millis=duration)
-    time.sleep(duration/1000)
-
 def turn_left(rob, speed, duration):
-    """
-    Turn the robot left.
-    """
     rob.move_blocking(left_speed=-speed, right_speed=speed, millis=duration)
     time.sleep(duration/1000)
 
 def turn_right(rob, speed, duration):
-    """
-    Turn the robot right.
-    """
     rob.move_blocking(left_speed=speed, right_speed=-speed, millis=duration)
     time.sleep(duration/1000)
 
-
-
-
-
-
-def fitness(individual, rob, start_position, start_orientation, target_position):
+def fitness(individual, rob, start_position, start_orientation, target_position, controller, steps):
     rob.set_position(start_position, start_orientation)  # Reset robot's position at the start of each evaluation
+    controller.set(individual, n_inputs=5)  # Initialize the controller with the weights
     collisions = 0
     distance_to_target = float('inf')
 
     threshold = 20
 
-    print('individual',individual)
-    for command in individual:
-        # Execute command
-        if command == "move_forward":
+    for _ in range(steps):  # 20 steps for evaluation
+        sensor_dict = read_irs_sensors(rob)
+        print('sensor_dict', sensor_dict)
+        sensor_inputs = list(sensor_dict.values())
+        action = controller.control(sensor_inputs, individual)
+        print('action', action)
+
+        if action == "move_forward":
             move_forward(rob, speed=50, duration=500)
-        elif command == "turn_left":
+        elif action == "turn_left":
             turn_left(rob, speed=50, duration=500)
-        elif command == "turn_right":
+        elif action == "turn_right":
             turn_right(rob, speed=50, duration=500)
 
-        # Check for collisions
         sensor_dict = read_irs_sensors(rob)
         if (sensor_dict["FrontC"] > threshold or
             sensor_dict["FrontR"] > threshold or
             sensor_dict["FrontL"] > threshold):
-
             collisions += 1
 
-        # Calculate distance to target
         current_position = rob.get_position()
-        print('current_position',current_position)
         distance_to_target = ((current_position.x - target_position.x) ** 2 +
                               (current_position.y - target_position.y) ** 2) ** 0.5
         
-    print(collisions)
-
-    print('distance_to_target',distance_to_target)
-        
-    fit= -distance_to_target - (collisions * 10)  # Negative because we want to minimize this value
-    print(fit)
-
+    fit = -distance_to_target - (collisions * 10)  # Negative because we want to minimize this value
     return fit
 
-
-def initialize_population(size):
-    commands = ["move_forward", "turn_left", "turn_right"]
-    return [[random.choice(commands) for _ in range(20)] for _ in range(size)]
-
+def initialize_population(size, n_weights):
+    return [np.random.uniform(-10, 10, n_weights) for _ in range(size)]
 
 def selection(population, fitnesses, num_parents):
-    # Combine the population with their respective fitness scores
     combined = list(zip(population, fitnesses))
-    # Sort based on fitness scores in descending order (higher fitness is better)
     combined.sort(key=lambda x: x[1], reverse=True)
-    # Select the top num_parents individuals
     selected_parents = [individual for individual, fitness in combined[:num_parents]]
     return selected_parents
 
-
 def crossover(parent1, parent2):
     crossover_point = random.randint(0, len(parent1))
-    child1 = parent1[:crossover_point] + parent2[crossover_point:]
-    child2 = parent2[:crossover_point] + parent1[crossover_point:]
+    child1 = np.concatenate((parent1[:crossover_point], parent2[crossover_point:]))
+    child2 = np.concatenate((parent2[:crossover_point], parent1[crossover_point:]))
     return child1, child2
 
-
 def mutate(individual, mutation_rate=0.1):
-    commands = ["move_forward", "turn_left", "turn_right"]
     for i in range(len(individual)):
         if random.random() < mutation_rate:
-            individual[i] = random.choice(commands)
+            individual[i] += np.random.normal()
     return individual
-
-
 
 def save_checkpoint(population, fitnesses, best_individual, generation, filename='checkpoint.pkl'):
     with open(filename, 'wb') as f:
@@ -156,36 +162,41 @@ def save_checkpoint(population, fitnesses, best_individual, generation, filename
             'generation': generation
         }, f)
 
-
 def load_checkpoint(filename='checkpoint.pkl'):
     with open(filename, 'rb') as f:
         checkpoint = pickle.load(f)
     return checkpoint
 
-
 def evolutionary_algorithm(rob, start_position, start_orientation, target_position,
                             generations=100, population_size=20,
-                              checkpoint_file='checkpoint.pkl', continue_from_checkpoint=False):
+                            checkpoint_file='checkpoint.pkl', continue_from_checkpoint=False,
+                            steps=20):
+    
+    n_hidden = 1
+    n_inputs = 5  # Number of sensors
+    n_outputs = 3  # Number of actions
+    n_weights = n_inputs * n_hidden + n_hidden * n_outputs + n_hidden + n_outputs
+
+    print('n_weights', n_weights)
+
+    controller = robot_controller(n_hidden)
     
     if continue_from_checkpoint:
-        # Load checkpoint
         checkpoint = load_checkpoint(checkpoint_file)
         population = checkpoint['population']
         generation_start = checkpoint['generation'] + 1
         best_individual = checkpoint['best_individual']
     else:
-        population = initialize_population(population_size)
+        population = initialize_population(population_size, n_weights)
         generation_start = 0
         best_individual = None
 
     for generation in range(generation_start, generations):
-        fitnesses = [fitness(individual, rob, start_position, start_orientation, target_position) for individual in population]
-
-        # Select parents
-        num_parents = max(1, population_size // 10)  # Calculate 10% of the population size
+        fitnesses = [fitness(individual, rob, start_position, start_orientation, target_position, controller, steps) for individual in population]
+        
+        num_parents = max(1, population_size // 10)
         parents = selection(population, fitnesses, num_parents)
 
-        # Generate new population through crossover and mutation
         new_population = []
         while len(new_population) < (population_size - num_parents):
             parent1, parent2 = random.sample(parents, 2)
@@ -193,29 +204,11 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
             new_population.append(mutate(child1))
             new_population.append(mutate(child2))
 
-        # Keep the best individuals from the current population
         population = new_population[:population_size - num_parents] + parents
 
-        # Save checkpoint
         best_individual_index = fitnesses.index(max(fitnesses))
         best_individual = population[best_individual_index]
         save_checkpoint(population, fitnesses, best_individual, generation, checkpoint_file)
 
-        # Print best fitness in each generation
         best_fitness = max(fitnesses)
         print(f"Generation {generation}: Best Fitness = {best_fitness}")
-
-    return best_individual
-
-
-
-# if __name__ == "__main__":
-#     robobo = SimulationRobobo()  # Initialize your simulation robot
-#     robobo.play_simulation()  # Start the simulation
-
-#     target_position = Position(x=10.0, y=10.0, z=0.0)  # Set the target position
-#     try:
-#         best_path = evolutionary_algorithm(robobo, target_position)
-#         print("Best Path:", best_path)
-#     finally:
-#         robobo.stop_simulation()  # Stop the simulation when done

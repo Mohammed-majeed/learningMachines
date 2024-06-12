@@ -17,6 +17,7 @@ from robobo_interface import (
 
 from learning_machines import task_0
 from learning_machines import task_1
+from learning_machines import task_1_v2
 
 
 def test_emotions(rob: IRobobo):
@@ -104,12 +105,14 @@ def test_hardware(rob: HardwareRobobo):
 
 def run_task(rob):
 
-    start_position = Position(x=0, y=0, z=0.0)  # Set the starting position
-    start_orientation = Orientation(yaw=-175, pitch=-20, roll=90)  # Set the starting orientation
+    # start_position = Position(x=0.125, y=0.202, z=0.09)  # Set the starting position
+
+    start_position = Position(x=0.0, y=0.0, z=0.09)  # Set the starting position
+    start_orientation = Orientation(yaw=-175.00036138789557, pitch=-19.996487020842473, roll=4.820286812070959e-05)  # Set the starting orientation
     target_position = Position(x=1.5, y=1.5, z=0.0)  # Set the target position
 
     try:
-        best_path = task_1.evolutionary_algorithm(rob, start_position, start_orientation, target_position)
+        best_path = task_1_v2.evolutionary_algorithm(rob, start_position, start_orientation, target_position)
         print("Best Path:", best_path)
     finally:
         rob.stop_simulation()  # Stop the simulation when done
@@ -123,13 +126,15 @@ def run_all_actions(rob: IRobobo):
 
     # task_0.avoid_obstacle(rob)
     # task_0.touch_wall_backup(rob)
+    # print(rob.read_orientation())
+    # print("\n\nrob.read_orientation()\n\n")
 
     run_task(rob)
 
 
 
-    if isinstance(rob, SimulationRobobo):
-        test_sim(rob)
+    # if isinstance(rob, SimulationRobobo):
+    #     test_sim(rob)
 
     if isinstance(rob, HardwareRobobo):
         test_hardware(rob)
