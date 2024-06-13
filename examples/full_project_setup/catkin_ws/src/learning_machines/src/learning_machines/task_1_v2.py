@@ -7,7 +7,6 @@ import os
 from scipy import stats
 
 from data_files import RESULT_DIR
-
 from robobo_interface import (
     IRobobo,
     Emotion,
@@ -31,32 +30,18 @@ class robot_controller:
             self.weights2 = controller[weights1_slice + 3:].reshape((self.n_hidden[0], 3))
 
     def control(self, inputs, controller):
-        inputs = np.array(inputs)  # Convert inputs to a NumPy array
+        inputs = np.array(inputs)
         input_min = min(inputs)
         input_max = max(inputs)
-
-        # if input_max - input_min != 0:
-        #     inputs = (inputs - input_min) / float(input_max - input_min)
-        #     print('inputs',inputs)
-
-        # else:
-        #     inputs = inputs * 0
-        #     print('inputs 0',inputs)
-
 
         if self.n_hidden[0] > 0:
             output1 = relu_activation(inputs.dot(self.weights1) + self.bias1)
             output = softmax_activation(output1.dot(self.weights2) + self.bias2)[0]
-            print('output if',output)
-
         else:
             bias = controller[:3].reshape(1, 3)
             weights = controller[3:].reshape((len(inputs), 3))
             output = softmax_activation(inputs.dot(weights) + bias)[0]
-            print('output else',output)
 
-        # if output[0] > 0.5:
-        #     return 'move_forward'
         if output[1] > 0.5:
             return 'turn_left'
         elif output[2] > 0.5:
@@ -71,48 +56,6 @@ def softmax_activation(x):
     e_x = np.exp(x - np.max(x))
     return e_x / e_x.sum(axis=1, keepdims=True)
 
-# class robot_controller:
-#     def __init__(self, _n_hidden):
-#         self.n_hidden = [_n_hidden]
-
-#     def set(self, controller, n_inputs):
-#         if self.n_hidden[0] > 0:
-#             self.bias1 = controller[:self.n_hidden[0]].reshape(1, self.n_hidden[0])
-#             weights1_slice = n_inputs * self.n_hidden[0] + self.n_hidden[0]
-#             self.weights1 = controller[self.n_hidden[0]:weights1_slice].reshape((n_inputs, self.n_hidden[0]))
-#             self.bias2 = controller[weights1_slice:weights1_slice + 3].reshape(1, 3)
-#             self.weights2 = controller[weights1_slice + 3:].reshape((self.n_hidden[0], 3))
-
-#     def control(self, inputs, controller):
-#         inputs = np.array(inputs)  # Convert inputs to a NumPy array
-#         input_min = min(inputs)
-#         input_max = max(inputs)
-#         if input_max - input_min != 0:
-#             inputs = (inputs - input_min) / float(input_max - input_min)
-#         else:
-#             inputs = inputs * 0
-
-#         if self.n_hidden[0] > 0:
-#             output1 = sigmoid_activation(inputs.dot(self.weights1) + self.bias1)
-#             output = sigmoid_activation(output1.dot(self.weights2) + self.bias2)[0]
-#         else:
-#             bias = controller[:3].reshape(1, 3)
-#             weights = controller[3:].reshape((len(inputs), 3))
-#             output = sigmoid_activation(inputs.dot(weights) + bias)[0]
-
-#         if output[0] > 0.3:
-#             return 'move_forward'
-#         elif output[1] > 0.5:
-#             return 'turn_left'
-#         elif output[2] > 0.5:
-#             return 'turn_right'
-#         else:
-#             return 'move_forward'
-
-
-# def sigmoid_activation(x):
-#     return 1. / (1. + np.exp(-x))
-
 def read_irs_sensors(rob, num_reads=7):
     joint_list = ["BackL", "BackR", "FrontL", "FrontR", "FrontC", "FrontRR", "BackC", "FrontLL"]
     no_obstacle_sens_values = [6.434948026696321, 6.4375698872759655, 52.26984940735039, 52.270314744820546, 5.845623601383301, 5.890924916422574, 57.76850943075616, 5.925058770384208]
@@ -122,12 +65,10 @@ def read_irs_sensors(rob, num_reads=7):
         temp = rob.read_irs()
         temp2 = []
         for i, val in enumerate(temp):
-            if val != math.inf:          
+            if val != math.inf:
                 temp2.append(abs(temp[i]))
             else:
                 temp2.append(abs(no_obstacle_sens_values[i]))
-        # irs_data = np.round(np.array(temp2) - np.array(no_obstacle_sens_values), decimals=1)
-        # irs_data = np.round(np.array(temp2)), decimals=1)
         for joint, value in zip(joint_list, temp2):
             readings[joint].append(value)
     sensor_modes = {joint: stats.mode(values)[0][0] for joint, values in readings.items()}
@@ -139,70 +80,32 @@ def read_irs_sensors(rob, num_reads=7):
         "FrontRR": sensor_modes["FrontRR"],
         "FrontLL": sensor_modes["FrontLL"]
     }
-    print(front_sensors)
     return front_sensors
-
-# def read_irs_sensors(rob, num_reads=7):
-#     joint_list = ["BackL", "BackR", "FrontL", "FrontR", "FrontC", "FrontRR", "BackC", "FrontLL"]
-#     no_obstacle_sens_values = [6.434948026696321, 6.4375698872759655, 52.26984940735039, 52.270314744820546, 5.845623601383301, 5.890924916422574, 57.76850943075616, 5.925058770384208]
-
-#     readings = {joint: [] for joint in joint_list}
-#     for _ in range(num_reads):
-#         temp = rob.read_irs()
-#         temp2 = []
-#         for i, val in enumerate(temp):
-#             if val != math.inf:
-#                 temp2.append(abs(temp[i]))
-#             else:
-#                 temp2.append(abs(no_obstacle_sens_values[i]))
-#         irs_data = np.round(np.array(temp2), decimals=1)
-#         for joint, value in zip(joint_list, irs_data):
-#             readings[joint].append(value)
-    
-#     # sensor_modes = {joint: stats.mode(values)[0][0] for joint, values in readings.items()}
-#     sensor_modes = {joint: round(stats.mode(values)[0][0], 1) for joint, values in readings.items()}
-
-#     max_value = max(sensor_modes.values())
-
-#     normalized_sensors = {joint: value / max_value for joint, value in sensor_modes.items()}
-
-#     front_sensors = {
-#         "FrontC": normalized_sensors["FrontC"],
-#         "FrontR": normalized_sensors["FrontR"],
-#         "FrontL": normalized_sensors["FrontL"],
-#         "FrontRR": normalized_sensors["FrontRR"],
-#         "FrontLL": normalized_sensors["FrontLL"]
-#     }
-#     print(front_sensors)
-    
-#     return front_sensors
 
 def move_forward(rob, speed, duration):
     rob.move_blocking(left_speed=speed, right_speed=speed, millis=duration)
-    # time.sleep(duration/1000)
 
 def turn_left(rob, speed, duration):
     rob.move_blocking(left_speed=-speed, right_speed=speed, millis=duration)
-    # time.sleep(duration/1000)
 
 def turn_right(rob, speed, duration):
     rob.move_blocking(left_speed=speed, right_speed=-speed, millis=duration)
-    # time.sleep(duration/1000)
 
 def fitness(individual, rob, start_position, start_orientation, target_position, controller, steps):
-    rob.set_position(start_position, start_orientation)  # Reset robot's position at the start of each evaluation
-    controller.set(individual, n_inputs=5)  # Initialize the controller with the weights
+    rob.set_position(start_position, start_orientation)
+    controller.set(individual, n_inputs=5)
     collisions = 0
     distance_to_target = float('inf')
 
-    threshold = 250 # threshold for collisions
+    threshold = 250  # threshold for collisions
 
-    for _ in range(steps):  # 20 steps for evaluation
+    previous_positions = []
+    stuck_threshold = 3  # Number of steps to consider the robot stuck
+
+    for _ in range(steps):
         sensor_dict = read_irs_sensors(rob)
-        # print('sensor_dict', sensor_dict)
         sensor_inputs = list(sensor_dict.values())
         action = controller.control(sensor_inputs, individual)
-        print('action', action)
 
         if action == "move_forward":
             move_forward(rob, speed=50, duration=500)
@@ -218,27 +121,32 @@ def fitness(individual, rob, start_position, start_orientation, target_position,
             collisions += 1
 
         current_position = rob.get_position()
+        previous_positions.append(current_position)
+
+        if len(previous_positions) > stuck_threshold:
+            # Calculate the average movement over the last few steps
+            average_movement = sum(((previous_positions[i].x - previous_positions[i-1].x)**2 + 
+                                    (previous_positions[i].y - previous_positions[i-1].y)**2)**0.5 
+                                   for i in range(1, stuck_threshold)) / stuck_threshold
+            if average_movement < 1.0:  # If the robot is moving less than 1 unit on average, consider it stuck
+                collisions += 5  # Penalize for being stuck
+                previous_positions = previous_positions[-stuck_threshold:]
+
         distance_to_target = ((current_position.x - target_position.x) ** 2 +
                               (current_position.y - target_position.y) ** 2) ** 0.5
-        
-    fit = -distance_to_target - (collisions * 10)  # Negative because we want to minimize this value
-    print("fit",fit)
+
+    fit = -distance_to_target - (collisions * 10)
+    print("fit", fit)
     return fit
 
 def initialize_population(size, n_weights):
     return [np.random.uniform(-10, 10, n_weights) for _ in range(size)]
 
-# def selection(population, fitnesses, num_parents):
-#     combined = list(zip(population, fitnesses))
-#     combined.sort(key=lambda x: x[1], reverse=True)
-#     selected_parents = [individual for individual, fitness in combined[:num_parents]]
-#     return selected_parents
-
 def tournament_selection(population, fitnesses, num_parents, tournament_size=3):
     selected_parents = []
     for _ in range(num_parents):
         tournament = random.sample(list(zip(population, fitnesses)), tournament_size)
-        tournament.sort(key=lambda x: x[1], reverse=True)
+        tournament.sort(key=lambda x: abs(x[1]), reverse=False)  # Sort by absolute fitness to find the closest to zero
         selected_parents.append(tournament[0][0])
     return selected_parents
 
@@ -256,27 +164,25 @@ def mutate(individual, mutation_rate=0.5):
 
 def save_checkpoint_jsonl(population, fitnesses, best_individual, generation, filename):
     try:
-        best_fitness = max(fitnesses)  # Calculate the best fitness
+        best_fitness = max(fitnesses, key=lambda x: abs(x))
         checkpoint = {
             'generation': generation,
             'fitnesses': fitnesses,
-            'best_fitness': best_fitness,  # Save the best fitness
+            'best_fitness': best_fitness,
             'best_individual': best_individual.tolist(),
             'population': [ind.tolist() for ind in population]
         }
-        with open(filename, 'a') as f:  # Open in append mode
+        with open(filename, 'a') as f:
             f.write(json.dumps(checkpoint) + '\n')
         print(f"Checkpoint saved successfully at generation {generation}")
     except Exception as e:
         print(f"Error saving checkpoint: {e}")
 
-
-
 def load_checkpoint_jsonl(filename):
     try:
         with open(filename, 'r') as f:
             last_line = None
-            for last_line in f:  # Read the last line
+            for last_line in f:
                 pass
             if last_line is None:
                 raise ValueError("Checkpoint file is empty")
@@ -288,14 +194,12 @@ def load_checkpoint_jsonl(filename):
     except Exception as e:
         print(f"Error loading checkpoint: {e}")
         return None
-    
 
-checkpoint_path = str(RESULT_DIR/"checkpoint.jsonl")
+checkpoint_path = str(RESULT_DIR / "checkpoint.jsonl")
 n_hidden = 2
-n_inputs = 5  # Number of sensors
-n_outputs = 3  # Number of actions
+n_inputs = 5
+n_outputs = 3
 
-# Usage of the new selection function in the evolutionary_algorithm function
 def evolutionary_algorithm(rob, start_position, start_orientation, target_position,
                            generations=25, population_size=10,
                            checkpoint_file=checkpoint_path, continue_from_checkpoint=True,
@@ -323,7 +227,7 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
     for generation in range(generation_start, generations):
         fitnesses = [fitness(individual, rob, start_position, start_orientation, target_position, controller, steps) for individual in population]
         
-        num_parents = max(2, population_size // 10)  # Calculate 10% of population size, ensuring at least 2 parents
+        num_parents = max(2, population_size // 10)
         parents = tournament_selection(population, fitnesses, num_parents, tournament_size=3)
 
         new_population = []
@@ -335,30 +239,27 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
 
         population = new_population[:population_size - num_parents] + parents
 
-        best_individual_index = fitnesses.index(max(fitnesses))
+        best_individual_index = fitnesses.index(max(fitnesses, key=lambda x: abs(x)))
         best_individual = population[best_individual_index]
         save_checkpoint_jsonl(population, fitnesses, best_individual, generation, checkpoint_file)
 
-        best_fitness = max(fitnesses)
+        best_fitness = max(fitnesses, key=lambda x: abs(x))
         print(f"Generation {generation}: Best Fitness = {best_fitness}")
 
 
 
-
-
-###################
-# test best individual 
-
+##########
+# for test
 
 def load_best_individual():
     try:
         best_individual = None
-        best_fitness_diff = float('inf')  # Initialize to a large value for finding the closest to zero
+        best_fitness_diff = float('inf')
         
         with open(checkpoint_path, 'r') as f:
             for line in f:
                 checkpoint = json.loads(line)
-                fitness_diff = abs(checkpoint['best_fitness'])  # Calculate the absolute difference from zero
+                fitness_diff = abs(checkpoint['best_fitness'])
                 if fitness_diff < best_fitness_diff:
                     best_fitness_diff = fitness_diff
                     best_individual = np.array(checkpoint['best_individual'])
@@ -376,16 +277,13 @@ def load_best_individual():
 def test_best_individual(rob, start_position, start_orientation, target_position, steps=20):
     controller = robot_controller(n_hidden)
     best_individual = load_best_individual()
-    controller.set(best_individual, n_inputs)  # Initialize the controller with the best individual weights
-
-    controller.set(best_individual, n_inputs)  # Initialize the controller with the weights
+    controller.set(best_individual, n_inputs)
     collisions = 0
 
-    threshold = 250 # threshold for collisions
+    threshold = 250
 
-    for _ in range(steps):  # 20 steps for evaluation
+    for _ in range(steps):
         sensor_dict = read_irs_sensors(rob)
-        # print('sensor_dict', sensor_dict)
         sensor_inputs = list(sensor_dict.values())
         action = controller.control(sensor_inputs, best_individual)
         print('action', action)

@@ -136,8 +136,8 @@ def run_all_actions(rob: IRobobo):
     # task_0.touch_wall_backup(rob)
 
 
-    # train_task_1(rob)
-    test_task_1(rob)
+    train_task_1(rob)
+    # test_task_1(rob)
 
 
     if isinstance(rob, SimulationRobobo):
