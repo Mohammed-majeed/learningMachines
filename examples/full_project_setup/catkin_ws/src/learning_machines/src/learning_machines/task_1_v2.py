@@ -73,9 +73,9 @@ def read_irs_sensors(rob, num_reads=7):
                 temp2.append(abs(temp[i]))
             else:
                 temp2.append(abs(no_obstacle_sens_values[i]))
-        irs_data = np.round(np.array(temp2) - np.array(no_obstacle_sens_values), decimals=1)
+        # irs_data = np.round(np.array(temp2) - np.array(no_obstacle_sens_values), decimals=1)
         # irs_data = np.round(np.array(temp2)), decimals=1)
-        for joint, value in zip(joint_list, irs_data):
+        for joint, value in zip(joint_list, temp2):
             readings[joint].append(value)
     sensor_modes = {joint: stats.mode(values)[0][0] for joint, values in readings.items()}
 
@@ -243,7 +243,7 @@ n_outputs = 3  # Number of actions
 
 # Usage of the new selection function in the evolutionary_algorithm function
 def evolutionary_algorithm(rob, start_position, start_orientation, target_position,
-                           generations=100, population_size=5,
+                           generations=10, population_size=25,
                            checkpoint_file=checkpoint_path, continue_from_checkpoint=True,
                            steps=20):
 
@@ -312,40 +312,32 @@ def load_best_individual():
         print(f"Error loading best individual: {e}")
         return None
 
-def test_best_individual(rob, start_position, start_orientation, target_position, steps):
+def test_best_individual(rob, start_position, start_orientation, target_position, steps=20):
     controller = robot_controller(n_hidden)
     best_individual = load_best_individual()
     controller.set(best_individual, n_inputs)  # Initialize the controller with the best individual weights
 
-    fit = fitness(best_individual, rob, start_position, start_orientation, target_position, controller, steps)
+    controller.set(best_individual, n_inputs)  # Initialize the controller with the weights
+    collisions = 0
 
-    # rob.set_position(start_position, start_orientation)  # Reset robot's position at the start of the test
-    # distance_to_target = float('inf')
-    # threshold = 75 # threshold for collisions
-    # collisions = 0
+    threshold = 250 # threshold for collisions
 
-    # for _ in range(steps):
-    #     sensor_dict = read_irs_sensors(rob)
-    #     sensor_inputs = list(sensor_dict.values())
-    #     action = controller.control(sensor_inputs, best_individual)
+    for _ in range(steps):  # 20 steps for evaluation
+        sensor_dict = read_irs_sensors(rob)
+        # print('sensor_dict', sensor_dict)
+        sensor_inputs = list(sensor_dict.values())
+        action = controller.control(sensor_inputs, best_individual)
+        print('action', action)
 
-    #     if action == "move_forward":
-    #         move_forward(rob, speed=50, duration=500)
-    #     elif action == "turn_left":
-    #         turn_left(rob, speed=50, duration=500)
-    #     elif action == "turn_right":
-    #         turn_right(rob, speed=50, duration=500)
+        if action == "move_forward":
+            move_forward(rob, speed=50, duration=500)
+        elif action == "turn_left":
+            turn_left(rob, speed=50, duration=500)
+        elif action == "turn_right":
+            turn_right(rob, speed=50, duration=500)
 
-    #     sensor_dict = read_irs_sensors(rob)
-    #     if (sensor_dict["FrontC"] > threshold or
-    #         sensor_dict["FrontR"] > threshold or
-    #         sensor_dict["FrontL"] > threshold):
-    #         collisions += 1
-
-    #     current_position = rob.get_position()
-    #     distance_to_target = ((current_position.x - target_position.x) ** 2 +
-    #                           (current_position.y - target_position.y) ** 2) ** 0.5
-
-    # fit = -distance_to_target - (collisions * 10)  # Negative because we want to minimize this value
-    print("Test fit:", fit)
-    # return fit
+        sensor_dict = read_irs_sensors(rob)
+        if (sensor_dict["FrontC"] > threshold or
+            sensor_dict["FrontR"] > threshold or
+            sensor_dict["FrontL"] > threshold):
+            collisions += 1
