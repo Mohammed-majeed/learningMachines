@@ -80,17 +80,22 @@ def read_irs_sensors(rob, num_reads=7):
         "FrontRR": sensor_modes["FrontRR"],
         "FrontLL": sensor_modes["FrontLL"]
     }
-    # print(front_sensors)
+    print(front_sensors)
     return front_sensors
 
 def move_forward(rob, speed, duration):
     rob.move_blocking(left_speed=speed, right_speed=speed, millis=duration)
+    time.sleep(duration/1000)
 
 def turn_left(rob, speed, duration):
     rob.move_blocking(left_speed=-speed, right_speed=speed, millis=duration)
+    time.sleep(duration/1000)
+
 
 def turn_right(rob, speed, duration):
     rob.move_blocking(left_speed=speed, right_speed=-speed, millis=duration)
+    time.sleep(duration/1000)
+
 
 def fitness(individual, rob, start_position, start_orientation, target_position, controller, steps):
     rob.set_position(start_position, start_orientation)
@@ -98,7 +103,7 @@ def fitness(individual, rob, start_position, start_orientation, target_position,
     collisions = 0
     distance_to_target = float('inf')
 
-    threshold = 350  # threshold for collisions
+    threshold = 250  # threshold for collisions
 
     previous_positions = []
     stuck_threshold = 5  # Number of steps to consider the robot stuck
@@ -131,7 +136,7 @@ def fitness(individual, rob, start_position, start_orientation, target_position,
         if len(previous_positions) == stuck_threshold:
             # Calculate the average movement over the last few steps
             average_movement = sum(math.sqrt((previous_positions[i].x - previous_positions[i-1].x) ** 2 +(previous_positions[i].y - previous_positions[i-1].y) ** 2)for i in range(1, stuck_threshold)) / (stuck_threshold - 1)
-            print('average_movement',average_movement)
+            # print('average_movement',average_movement)
             
             if average_movement < 0.07:  # If the robot is moving less than 1 unit on average, consider it stuck
                 collisions += 2  # Penalize for being stuck
@@ -141,7 +146,7 @@ def fitness(individual, rob, start_position, start_orientation, target_position,
         distance_to_target = math.sqrt((current_position.x - target_position.x) ** 2 +
                                        (current_position.y - target_position.y) ** 2)
 
-    fit = -distance_to_target - (collisions * 5)
+    fit = -distance_to_target - (collisions * 10)
     print("fit", fit)
     return fit
 
@@ -154,7 +159,7 @@ def tournament_selection(population, fitnesses, num_parents, tournament_size=5):
         tournament = random.sample(list(zip(population, fitnesses)), tournament_size)
         tournament.sort(key=lambda x: abs(x[1]), reverse=False)  # Sort by absolute fitness to find the closest to zero
         selected_parents.append(tournament[0][0])
-    print("selected_parents",selected_parents)
+    # print("selected_parents",selected_parents)
     return selected_parents
 
 def crossover(parent1, parent2):
@@ -281,7 +286,7 @@ def load_best_individual():
         print(f"Error loading best individual: {e}")
         return None
 
-def test_best_individual(rob, start_position, start_orientation, target_position, steps=20):
+def test_best_individual(rob, start_position, start_orientation, target_position, steps=30):
     controller = robot_controller(n_hidden)
     best_individual = load_best_individual()
     controller.set(best_individual, n_inputs)
