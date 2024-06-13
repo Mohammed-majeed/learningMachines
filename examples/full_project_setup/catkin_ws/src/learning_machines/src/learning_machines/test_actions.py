@@ -1,6 +1,6 @@
 import cv2
 
-from data_files import FIGRURES_DIR
+from data_files import FIGRURES_DIR,RESULT_DIR
 from robobo_interface import (
     IRobobo,
     Emotion,
@@ -12,6 +12,7 @@ from robobo_interface import (
     Position,
     Orientation,
 )
+import json
 
 
 
@@ -117,12 +118,24 @@ def train_task_1(rob):
     finally:
         rob.stop_simulation()  # Stop the simulation when done
 
-def test_task_1(rob):
+
+sensor_data_sim_path = str(RESULT_DIR / "sensor_data_simulation.jsonl")
+sensor_data_hardware_path = str(RESULT_DIR / "sensor_data_hardware.jsonl")
+
+def save_sensor_data(sensor_data, filename):
+    with open(filename, 'a') as f:
+        for data in sensor_data:
+            f.write(json.dumps(data) + '\n')
+    print(f"Sensor data saved successfully to {filename}")
+
+def test_task_1(rob, sensor_data_path):
     start_position = Position(x=0.0, y=0.0, z=0.09)  # Set the starting position
     start_orientation = Orientation(yaw=-175.00036138789557, pitch=-19.996487020842473, roll=4.820286812070959e-05)  # Set the starting orientation
     target_position = Position(x=-0.5, y=1, z=0.0)  # Set the target position
 
-    task_1_v2.test_best_individual(rob, start_position, start_orientation, target_position)
+    sensor_data_per_step = task_1_v2.test_best_individual(rob, start_position, start_orientation, target_position)
+    save_sensor_data(sensor_data_per_step, sensor_data_path)
+
     print("Done testing")
 
 
@@ -131,22 +144,27 @@ def test_task_1(rob):
 def run_all_actions(rob: IRobobo):
     if isinstance(rob, SimulationRobobo):
         rob.play_simulation()
+        
+        # train_task_1(rob)
+        test_task_1(rob,sensor_data_sim_path)
 
     # task_0.avoid_obstacle(rob)
     # task_0.touch_wall_backup(rob)
 
 
-    train_task_1(rob)
-    # test_task_1(rob)
+    
+    
 
 
-    if isinstance(rob, SimulationRobobo):
-        test_sim(rob)
+    # if isinstance(rob, SimulationRobobo):
+    #     test_sim(rob)
 
     if isinstance(rob, HardwareRobobo):
         test_hardware(rob)
 
-    test_phone_movement(rob)
+        test_task_1(rob,sensor_data_hardware_path)
+
+    # test_phone_movement(rob)
 
     if isinstance(rob, SimulationRobobo):
         rob.stop_simulation()

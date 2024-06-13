@@ -291,11 +291,12 @@ def test_best_individual(rob, start_position, start_orientation, target_position
     best_individual = load_best_individual()
     controller.set(best_individual, n_inputs)
     collisions = 0
-
+    sensor_data_per_step = []
     threshold = 250
 
     for _ in range(steps):
         sensor_dict = read_irs_sensors(rob)
+        sensor_data_per_step.append(sensor_dict.copy())  
         sensor_inputs = list(sensor_dict.values())
         action = controller.control(sensor_inputs, best_individual)
         print('action', action)
@@ -312,3 +313,5 @@ def test_best_individual(rob, start_position, start_orientation, target_position
             sensor_dict["FrontR"] > threshold or
             sensor_dict["FrontL"] > threshold):
             collisions += 1
+
+    return sensor_data_per_step
