@@ -34,31 +34,84 @@ class robot_controller:
         inputs = np.array(inputs)  # Convert inputs to a NumPy array
         input_min = min(inputs)
         input_max = max(inputs)
-        if input_max - input_min != 0:
-            inputs = (inputs - input_min) / float(input_max - input_min)
-        else:
-            inputs = inputs * 0
+
+        # if input_max - input_min != 0:
+        #     inputs = (inputs - input_min) / float(input_max - input_min)
+        #     print('inputs',inputs)
+
+        # else:
+        #     inputs = inputs * 0
+        #     print('inputs 0',inputs)
+
 
         if self.n_hidden[0] > 0:
-            output1 = sigmoid_activation(inputs.dot(self.weights1) + self.bias1)
-            output = sigmoid_activation(output1.dot(self.weights2) + self.bias2)[0]
+            output1 = relu_activation(inputs.dot(self.weights1) + self.bias1)
+            output = softmax_activation(output1.dot(self.weights2) + self.bias2)[0]
+            print('output if',output)
+
         else:
             bias = controller[:3].reshape(1, 3)
             weights = controller[3:].reshape((len(inputs), 3))
-            output = sigmoid_activation(inputs.dot(weights) + bias)[0]
+            output = softmax_activation(inputs.dot(weights) + bias)[0]
+            print('output else',output)
 
-        if output[0] > 0.5:
-            return 'move_forward'
-        elif output[1] > 0.5:
+        # if output[0] > 0.5:
+        #     return 'move_forward'
+        if output[1] > 0.5:
             return 'turn_left'
         elif output[2] > 0.5:
             return 'turn_right'
         else:
             return 'move_forward'
 
+def relu_activation(x):
+    return np.maximum(0, x)
 
-def sigmoid_activation(x):
-    return 1. / (1. + np.exp(-x))
+def softmax_activation(x):
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum(axis=1, keepdims=True)
+
+# class robot_controller:
+#     def __init__(self, _n_hidden):
+#         self.n_hidden = [_n_hidden]
+
+#     def set(self, controller, n_inputs):
+#         if self.n_hidden[0] > 0:
+#             self.bias1 = controller[:self.n_hidden[0]].reshape(1, self.n_hidden[0])
+#             weights1_slice = n_inputs * self.n_hidden[0] + self.n_hidden[0]
+#             self.weights1 = controller[self.n_hidden[0]:weights1_slice].reshape((n_inputs, self.n_hidden[0]))
+#             self.bias2 = controller[weights1_slice:weights1_slice + 3].reshape(1, 3)
+#             self.weights2 = controller[weights1_slice + 3:].reshape((self.n_hidden[0], 3))
+
+#     def control(self, inputs, controller):
+#         inputs = np.array(inputs)  # Convert inputs to a NumPy array
+#         input_min = min(inputs)
+#         input_max = max(inputs)
+#         if input_max - input_min != 0:
+#             inputs = (inputs - input_min) / float(input_max - input_min)
+#         else:
+#             inputs = inputs * 0
+
+#         if self.n_hidden[0] > 0:
+#             output1 = sigmoid_activation(inputs.dot(self.weights1) + self.bias1)
+#             output = sigmoid_activation(output1.dot(self.weights2) + self.bias2)[0]
+#         else:
+#             bias = controller[:3].reshape(1, 3)
+#             weights = controller[3:].reshape((len(inputs), 3))
+#             output = sigmoid_activation(inputs.dot(weights) + bias)[0]
+
+#         if output[0] > 0.3:
+#             return 'move_forward'
+#         elif output[1] > 0.5:
+#             return 'turn_left'
+#         elif output[2] > 0.5:
+#             return 'turn_right'
+#         else:
+#             return 'move_forward'
+
+
+# def sigmoid_activation(x):
+#     return 1. / (1. + np.exp(-x))
 
 def read_irs_sensors(rob, num_reads=7):
     joint_list = ["BackL", "BackR", "FrontL", "FrontR", "FrontC", "FrontRR", "BackC", "FrontLL"]
@@ -180,6 +233,7 @@ def initialize_population(size, n_weights):
 #     combined.sort(key=lambda x: x[1], reverse=True)
 #     selected_parents = [individual for individual, fitness in combined[:num_parents]]
 #     return selected_parents
+
 def tournament_selection(population, fitnesses, num_parents, tournament_size=3):
     selected_parents = []
     for _ in range(num_parents):
@@ -243,7 +297,7 @@ n_outputs = 3  # Number of actions
 
 # Usage of the new selection function in the evolutionary_algorithm function
 def evolutionary_algorithm(rob, start_position, start_orientation, target_position,
-                           generations=10, population_size=25,
+                           generations=25, population_size=10,
                            checkpoint_file=checkpoint_path, continue_from_checkpoint=True,
                            steps=20):
 
@@ -298,16 +352,23 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
 
 def load_best_individual():
     try:
+        best_individual = None
+        best_fitness_diff = float('inf')  # Initialize to a large value for finding the closest to zero
+        
         with open(checkpoint_path, 'r') as f:
-            last_line = None
-            for last_line in f:  # Read the last line
-                pass
-            if last_line is None:
-                raise ValueError("Checkpoint file is empty")
-            checkpoint = json.loads(last_line)
-            best_individual = np.array(checkpoint['best_individual'])
-            print(f"Best individual loaded successfully from generation {checkpoint['generation']}")
-            return best_individual
+            for line in f:
+                checkpoint = json.loads(line)
+                fitness_diff = abs(checkpoint['best_fitness'])  # Calculate the absolute difference from zero
+                if fitness_diff < best_fitness_diff:
+                    best_fitness_diff = fitness_diff
+                    best_individual = np.array(checkpoint['best_individual'])
+                    
+        if best_individual is None:
+            raise ValueError("No valid best individual found in checkpoint file")
+
+        print(f"Best individual loaded successfully with fitness closest to zero: {best_fitness_diff}")
+        return best_individual
+
     except Exception as e:
         print(f"Error loading best individual: {e}")
         return None
