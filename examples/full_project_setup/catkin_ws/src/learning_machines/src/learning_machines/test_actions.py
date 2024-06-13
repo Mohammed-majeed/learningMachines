@@ -109,7 +109,7 @@ def train_task_1(rob):
 
     start_position = Position(x=0.0, y=0.0, z=0.09)  # Set the starting position
     start_orientation = Orientation(yaw=-175.00036138789557, pitch=-19.996487020842473, roll=4.820286812070959e-05)  # Set the starting orientation
-    target_position = Position(x=1.5, y=1.5, z=0.0)  # Set the target position
+    target_position = Position(x=-1.5, y=1, z=0.0)  # Set the target position
 
     try:
         task_1_v2.evolutionary_algorithm(rob, start_position, start_orientation, target_position)
@@ -120,7 +120,7 @@ def train_task_1(rob):
 def test_task_1(rob):
     start_position = Position(x=0.0, y=0.0, z=0.09)  # Set the starting position
     start_orientation = Orientation(yaw=-175.00036138789557, pitch=-19.996487020842473, roll=4.820286812070959e-05)  # Set the starting orientation
-    target_position = Position(x=1.5, y=1.5, z=0.0)  # Set the target position
+    target_position = Position(x=-1.5, y=1, z=0.0)  # Set the target position
 
     task_1_v2.test_best_individual(rob, start_position, start_orientation, target_position)
     print("Done testing")
@@ -136,8 +136,8 @@ def run_all_actions(rob: IRobobo):
     # task_0.touch_wall_backup(rob)
 
 
-    # train_task_1(rob)
-    test_task_1(rob)
+    train_task_1(rob)
+    # test_task_1(rob)
 
 
     if isinstance(rob, SimulationRobobo):

@@ -74,6 +74,7 @@ def read_irs_sensors(rob, num_reads=7):
             else:
                 temp2.append(abs(no_obstacle_sens_values[i]))
         irs_data = np.round(np.array(temp2) - np.array(no_obstacle_sens_values), decimals=1)
+        # irs_data = np.round(np.array(temp2)), decimals=1)
         for joint, value in zip(joint_list, irs_data):
             readings[joint].append(value)
     sensor_modes = {joint: stats.mode(values)[0][0] for joint, values in readings.items()}
@@ -85,8 +86,43 @@ def read_irs_sensors(rob, num_reads=7):
         "FrontRR": sensor_modes["FrontRR"],
         "FrontLL": sensor_modes["FrontLL"]
     }
-    
+    print(front_sensors)
     return front_sensors
+
+# def read_irs_sensors(rob, num_reads=7):
+#     joint_list = ["BackL", "BackR", "FrontL", "FrontR", "FrontC", "FrontRR", "BackC", "FrontLL"]
+#     no_obstacle_sens_values = [6.434948026696321, 6.4375698872759655, 52.26984940735039, 52.270314744820546, 5.845623601383301, 5.890924916422574, 57.76850943075616, 5.925058770384208]
+
+#     readings = {joint: [] for joint in joint_list}
+#     for _ in range(num_reads):
+#         temp = rob.read_irs()
+#         temp2 = []
+#         for i, val in enumerate(temp):
+#             if val != math.inf:
+#                 temp2.append(abs(temp[i]))
+#             else:
+#                 temp2.append(abs(no_obstacle_sens_values[i]))
+#         irs_data = np.round(np.array(temp2), decimals=1)
+#         for joint, value in zip(joint_list, irs_data):
+#             readings[joint].append(value)
+    
+#     # sensor_modes = {joint: stats.mode(values)[0][0] for joint, values in readings.items()}
+#     sensor_modes = {joint: round(stats.mode(values)[0][0], 1) for joint, values in readings.items()}
+
+#     max_value = max(sensor_modes.values())
+
+#     normalized_sensors = {joint: value / max_value for joint, value in sensor_modes.items()}
+
+#     front_sensors = {
+#         "FrontC": normalized_sensors["FrontC"],
+#         "FrontR": normalized_sensors["FrontR"],
+#         "FrontL": normalized_sensors["FrontL"],
+#         "FrontRR": normalized_sensors["FrontRR"],
+#         "FrontLL": normalized_sensors["FrontLL"]
+#     }
+#     print(front_sensors)
+    
+#     return front_sensors
 
 def move_forward(rob, speed, duration):
     rob.move_blocking(left_speed=speed, right_speed=speed, millis=duration)
@@ -106,14 +142,14 @@ def fitness(individual, rob, start_position, start_orientation, target_position,
     collisions = 0
     distance_to_target = float('inf')
 
-    threshold = 20
+    threshold = 250 # threshold for collisions
 
     for _ in range(steps):  # 20 steps for evaluation
         sensor_dict = read_irs_sensors(rob)
         # print('sensor_dict', sensor_dict)
         sensor_inputs = list(sensor_dict.values())
         action = controller.control(sensor_inputs, individual)
-        # print('action', action)
+        print('action', action)
 
         if action == "move_forward":
             move_forward(rob, speed=50, duration=500)
@@ -139,10 +175,17 @@ def fitness(individual, rob, start_position, start_orientation, target_position,
 def initialize_population(size, n_weights):
     return [np.random.uniform(-10, 10, n_weights) for _ in range(size)]
 
-def selection(population, fitnesses, num_parents):
-    combined = list(zip(population, fitnesses))
-    combined.sort(key=lambda x: x[1], reverse=True)
-    selected_parents = [individual for individual, fitness in combined[:num_parents]]
+# def selection(population, fitnesses, num_parents):
+#     combined = list(zip(population, fitnesses))
+#     combined.sort(key=lambda x: x[1], reverse=True)
+#     selected_parents = [individual for individual, fitness in combined[:num_parents]]
+#     return selected_parents
+def tournament_selection(population, fitnesses, num_parents, tournament_size=3):
+    selected_parents = []
+    for _ in range(num_parents):
+        tournament = random.sample(list(zip(population, fitnesses)), tournament_size)
+        tournament.sort(key=lambda x: x[1], reverse=True)
+        selected_parents.append(tournament[0][0])
     return selected_parents
 
 def crossover(parent1, parent2):
@@ -151,7 +194,7 @@ def crossover(parent1, parent2):
     child2 = np.concatenate((parent2[:crossover_point], parent1[crossover_point:]))
     return child1, child2
 
-def mutate(individual, mutation_rate=0.1):
+def mutate(individual, mutation_rate=0.5):
     for i in range(len(individual)):
         if random.random() < mutation_rate:
             individual[i] += np.random.normal()
@@ -194,18 +237,16 @@ def load_checkpoint_jsonl(filename):
     
 
 checkpoint_path = str(RESULT_DIR/"checkpoint.jsonl")
-n_hidden = 1
+n_hidden = 2
 n_inputs = 5  # Number of sensors
 n_outputs = 3  # Number of actions
 
+# Usage of the new selection function in the evolutionary_algorithm function
 def evolutionary_algorithm(rob, start_position, start_orientation, target_position,
-                           generations=100, population_size=25,
+                           generations=100, population_size=5,
                            checkpoint_file=checkpoint_path, continue_from_checkpoint=True,
                            steps=20):
 
-    # n_hidden = 1
-    # n_inputs = 5  # Number of sensors
-    # n_outputs = 3  # Number of actions
     n_weights = n_inputs * n_hidden + n_hidden * n_outputs + n_hidden + n_outputs
 
     controller = robot_controller(n_hidden)
@@ -229,7 +270,7 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
         fitnesses = [fitness(individual, rob, start_position, start_orientation, target_position, controller, steps) for individual in population]
         
         num_parents = max(2, population_size // 10)  # Calculate 10% of population size, ensuring at least 2 parents
-        parents = selection(population, fitnesses, num_parents)
+        parents = tournament_selection(population, fitnesses, num_parents, tournament_size=3)
 
         new_population = []
         while len(new_population) < (population_size - num_parents):
@@ -246,6 +287,7 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
 
         best_fitness = max(fitnesses)
         print(f"Generation {generation}: Best Fitness = {best_fitness}")
+
 
 
 
@@ -270,38 +312,40 @@ def load_best_individual():
         print(f"Error loading best individual: {e}")
         return None
 
-def test_best_individual(rob, start_position, start_orientation, target_position, steps=20):
+def test_best_individual(rob, start_position, start_orientation, target_position, steps):
     controller = robot_controller(n_hidden)
     best_individual = load_best_individual()
     controller.set(best_individual, n_inputs)  # Initialize the controller with the best individual weights
 
-    rob.set_position(start_position, start_orientation)  # Reset robot's position at the start of the test
-    distance_to_target = float('inf')
-    threshold = 20
-    collisions = 0
+    fit = fitness(best_individual, rob, start_position, start_orientation, target_position, controller, steps)
 
-    for _ in range(steps):
-        sensor_dict = read_irs_sensors(rob)
-        sensor_inputs = list(sensor_dict.values())
-        action = controller.control(sensor_inputs, best_individual)
+    # rob.set_position(start_position, start_orientation)  # Reset robot's position at the start of the test
+    # distance_to_target = float('inf')
+    # threshold = 75 # threshold for collisions
+    # collisions = 0
 
-        if action == "move_forward":
-            move_forward(rob, speed=50, duration=500)
-        elif action == "turn_left":
-            turn_left(rob, speed=50, duration=500)
-        elif action == "turn_right":
-            turn_right(rob, speed=50, duration=500)
+    # for _ in range(steps):
+    #     sensor_dict = read_irs_sensors(rob)
+    #     sensor_inputs = list(sensor_dict.values())
+    #     action = controller.control(sensor_inputs, best_individual)
 
-        sensor_dict = read_irs_sensors(rob)
-        if (sensor_dict["FrontC"] > threshold or
-            sensor_dict["FrontR"] > threshold or
-            sensor_dict["FrontL"] > threshold):
-            collisions += 1
+    #     if action == "move_forward":
+    #         move_forward(rob, speed=50, duration=500)
+    #     elif action == "turn_left":
+    #         turn_left(rob, speed=50, duration=500)
+    #     elif action == "turn_right":
+    #         turn_right(rob, speed=50, duration=500)
 
-        current_position = rob.get_position()
-        distance_to_target = ((current_position.x - target_position.x) ** 2 +
-                              (current_position.y - target_position.y) ** 2) ** 0.5
+    #     sensor_dict = read_irs_sensors(rob)
+    #     if (sensor_dict["FrontC"] > threshold or
+    #         sensor_dict["FrontR"] > threshold or
+    #         sensor_dict["FrontL"] > threshold):
+    #         collisions += 1
 
-    fit = -distance_to_target - (collisions * 10)  # Negative because we want to minimize this value
+    #     current_position = rob.get_position()
+    #     distance_to_target = ((current_position.x - target_position.x) ** 2 +
+    #                           (current_position.y - target_position.y) ** 2) ** 0.5
+
+    # fit = -distance_to_target - (collisions * 10)  # Negative because we want to minimize this value
     print("Test fit:", fit)
-    return fit
+    # return fit
