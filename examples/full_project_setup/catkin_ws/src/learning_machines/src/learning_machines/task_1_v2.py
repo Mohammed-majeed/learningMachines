@@ -80,6 +80,7 @@ def read_irs_sensors(rob, num_reads=7):
         "FrontRR": sensor_modes["FrontRR"],
         "FrontLL": sensor_modes["FrontLL"]
     }
+    # print(front_sensors)
     return front_sensors
 
 def move_forward(rob, speed, duration):
@@ -97,12 +98,12 @@ def fitness(individual, rob, start_position, start_orientation, target_position,
     collisions = 0
     distance_to_target = float('inf')
 
-    threshold = 250  # threshold for collisions
+    threshold = 350  # threshold for collisions
 
     previous_positions = []
-    stuck_threshold = 3  # Number of steps to consider the robot stuck
+    stuck_threshold = 5  # Number of steps to consider the robot stuck
 
-    for _ in range(steps):
+    for step in range(steps):
         sensor_dict = read_irs_sensors(rob)
         sensor_inputs = list(sensor_dict.values())
         action = controller.control(sensor_inputs, individual)
@@ -123,31 +124,37 @@ def fitness(individual, rob, start_position, start_orientation, target_position,
         current_position = rob.get_position()
         previous_positions.append(current_position)
 
+        # Keep the list size to stuck_threshold
         if len(previous_positions) > stuck_threshold:
+            previous_positions.pop(0)
+
+        if len(previous_positions) == stuck_threshold:
             # Calculate the average movement over the last few steps
-            average_movement = sum(((previous_positions[i].x - previous_positions[i-1].x)**2 + 
-                                    (previous_positions[i].y - previous_positions[i-1].y)**2)**0.5 
-                                   for i in range(1, stuck_threshold)) / stuck_threshold
-            if average_movement < 1.0:  # If the robot is moving less than 1 unit on average, consider it stuck
-                collisions += 5  # Penalize for being stuck
-                previous_positions = previous_positions[-stuck_threshold:]
+            average_movement = sum(math.sqrt((previous_positions[i].x - previous_positions[i-1].x) ** 2 +(previous_positions[i].y - previous_positions[i-1].y) ** 2)for i in range(1, stuck_threshold)) / (stuck_threshold - 1)
+            print('average_movement',average_movement)
+            
+            if average_movement < 0.07:  # If the robot is moving less than 1 unit on average, consider it stuck
+                collisions += 2  # Penalize for being stuck
+                # Reset previous_positions to current position only to avoid continuous penalty
+                previous_positions = [current_position]
 
-        distance_to_target = ((current_position.x - target_position.x) ** 2 +
-                              (current_position.y - target_position.y) ** 2) ** 0.5
+        distance_to_target = math.sqrt((current_position.x - target_position.x) ** 2 +
+                                       (current_position.y - target_position.y) ** 2)
 
-    fit = -distance_to_target - (collisions * 10)
+    fit = -distance_to_target - (collisions * 5)
     print("fit", fit)
     return fit
 
 def initialize_population(size, n_weights):
-    return [np.random.uniform(-10, 10, n_weights) for _ in range(size)]
+    return [np.random.uniform(-1, 1, n_weights) for _ in range(size)]
 
-def tournament_selection(population, fitnesses, num_parents, tournament_size=3):
+def tournament_selection(population, fitnesses, num_parents, tournament_size=5):
     selected_parents = []
     for _ in range(num_parents):
         tournament = random.sample(list(zip(population, fitnesses)), tournament_size)
         tournament.sort(key=lambda x: abs(x[1]), reverse=False)  # Sort by absolute fitness to find the closest to zero
         selected_parents.append(tournament[0][0])
+    print("selected_parents",selected_parents)
     return selected_parents
 
 def crossover(parent1, parent2):
@@ -164,7 +171,7 @@ def mutate(individual, mutation_rate=0.5):
 
 def save_checkpoint_jsonl(population, fitnesses, best_individual, generation, filename):
     try:
-        best_fitness = max(fitnesses, key=lambda x: abs(x))
+        best_fitness = min(fitnesses, key=lambda x: abs(x))  # Find the fitness closest to zero
         checkpoint = {
             'generation': generation,
             'fitnesses': fitnesses,
@@ -228,7 +235,7 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
         fitnesses = [fitness(individual, rob, start_position, start_orientation, target_position, controller, steps) for individual in population]
         
         num_parents = max(2, population_size // 10)
-        parents = tournament_selection(population, fitnesses, num_parents, tournament_size=3)
+        parents = tournament_selection(population, fitnesses, num_parents, tournament_size=5)
 
         new_population = []
         while len(new_population) < (population_size - num_parents):
@@ -239,11 +246,11 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
 
         population = new_population[:population_size - num_parents] + parents
 
-        best_individual_index = fitnesses.index(max(fitnesses, key=lambda x: abs(x)))
+        best_individual_index = fitnesses.index(min(fitnesses, key=lambda x: abs(x)))  # Find the best individual closest to zero
         best_individual = population[best_individual_index]
         save_checkpoint_jsonl(population, fitnesses, best_individual, generation, checkpoint_file)
 
-        best_fitness = max(fitnesses, key=lambda x: abs(x))
+        best_fitness = min(fitnesses, key=lambda x: abs(x))  # Find the best fitness closest to zero
         print(f"Generation {generation}: Best Fitness = {best_fitness}")
 
 
