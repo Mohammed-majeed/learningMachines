@@ -36,7 +36,7 @@ def read_irs_sensors(rob, num_reads=7):
         for joint, value in zip(joint_list, irs_data):
             readings[joint].append(value)
     sensor_modes = {joint: stats.mode(values)[0][0] for joint, values in readings.items()}
-    # print(sensor_modes)
+    
     return sensor_modes
 
 
@@ -76,7 +76,7 @@ def turn_right(rob, speed, duration):
 
 
 def fitness(individual, rob, start_position, start_orientation, target_position):
-    rob.set_position(start_position, start_orientation)  # Reset robot's position at the start of each evaluation
+    rob.set_position(start_position, start_orientation)  
     collisions = 0
     distance_to_target = float('inf')
 
@@ -84,7 +84,7 @@ def fitness(individual, rob, start_position, start_orientation, target_position)
 
     print('individual',individual)
     for command in individual:
-        # Execute command
+        
         if command == "move_forward":
             move_forward(rob, speed=50, duration=500)
         elif command == "turn_left":
@@ -92,7 +92,7 @@ def fitness(individual, rob, start_position, start_orientation, target_position)
         elif command == "turn_right":
             turn_right(rob, speed=50, duration=500)
 
-        # Check for collisions
+        
         sensor_dict = read_irs_sensors(rob)
         if (sensor_dict["FrontC"] > threshold or
             sensor_dict["FrontR"] > threshold or
@@ -100,7 +100,7 @@ def fitness(individual, rob, start_position, start_orientation, target_position)
 
             collisions += 1
 
-        # Calculate distance to target
+        
         current_position = rob.get_position()
         print('current_position',current_position)
         distance_to_target = ((current_position.x - target_position.x) ** 2 +
@@ -110,7 +110,7 @@ def fitness(individual, rob, start_position, start_orientation, target_position)
 
     print('distance_to_target',distance_to_target)
         
-    fit= -distance_to_target - (collisions * 10)  # Negative because we want to minimize this value
+    fit= -distance_to_target - (collisions * 10)  
     print(fit)
 
     return fit
@@ -122,11 +122,11 @@ def initialize_population(size):
 
 
 def selection(population, fitnesses, num_parents):
-    # Combine the population with their respective fitness scores
+    
     combined = list(zip(population, fitnesses))
-    # Sort based on fitness scores in descending order (higher fitness is better)
+    
     combined.sort(key=lambda x: x[1], reverse=True)
-    # Select the top num_parents individuals
+    
     selected_parents = [individual for individual, fitness in combined[:num_parents]]
     return selected_parents
 
@@ -168,7 +168,7 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
                               checkpoint_file='checkpoint.pkl', continue_from_checkpoint=False):
     
     if continue_from_checkpoint:
-        # Load checkpoint
+        
         checkpoint = load_checkpoint(checkpoint_file)
         population = checkpoint['population']
         generation_start = checkpoint['generation'] + 1
@@ -181,11 +181,11 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
     for generation in range(generation_start, generations):
         fitnesses = [fitness(individual, rob, start_position, start_orientation, target_position) for individual in population]
 
-        # Select parents
-        num_parents = max(1, population_size // 10)  # Calculate 10% of the population size
+        
+        num_parents = max(1, population_size // 10)  
         parents = selection(population, fitnesses, num_parents)
 
-        # Generate new population through crossover and mutation
+        
         new_population = []
         while len(new_population) < (population_size - num_parents):
             parent1, parent2 = random.sample(parents, 2)
@@ -193,15 +193,15 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
             new_population.append(mutate(child1))
             new_population.append(mutate(child2))
 
-        # Keep the best individuals from the current population
+        
         population = new_population[:population_size - num_parents] + parents
 
-        # Save checkpoint
+        
         best_individual_index = fitnesses.index(max(fitnesses))
         best_individual = population[best_individual_index]
         save_checkpoint(population, fitnesses, best_individual, generation, checkpoint_file)
 
-        # Print best fitness in each generation
+        
         best_fitness = max(fitnesses)
         print(f"Generation {generation}: Best Fitness = {best_fitness}")
 
@@ -209,13 +209,13 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
 
 
 
-# if __name__ == "__main__":
-#     robobo = SimulationRobobo()  # Initialize your simulation robot
-#     robobo.play_simulation()  # Start the simulation
 
-#     target_position = Position(x=10.0, y=10.0, z=0.0)  # Set the target position
-#     try:
-#         best_path = evolutionary_algorithm(robobo, target_position)
-#         print("Best Path:", best_path)
-#     finally:
-#         robobo.stop_simulation()  # Stop the simulation when done
+
+
+
+
+
+
+
+
+

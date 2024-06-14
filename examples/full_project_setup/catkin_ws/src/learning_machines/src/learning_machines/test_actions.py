@@ -119,8 +119,8 @@ def train_task_1(rob):
         rob.stop_simulation()  # Stop the simulation when done
 
 
-sensor_data_sim_path = str(RESULT_DIR / "sensor_data_simulation.jsonl")
-sensor_data_hardware_path = str(RESULT_DIR / "sensor_data_hardware.jsonl")
+sensor_data_sim_path = str(RESULT_DIR / "sensor_data_simulation_new.jsonl")
+sensor_data_hardware_path = str(RESULT_DIR / "sensor_data_hardware_new.jsonl")
 
 def save_sensor_data(sensor_data, filename):
     with open(filename, 'a') as f:

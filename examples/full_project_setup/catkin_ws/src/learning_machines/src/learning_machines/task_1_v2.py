@@ -18,25 +18,41 @@ from robobo_interface import (
 )
 
 class robot_controller:
-    def __init__(self, _n_hidden):
-        self.n_hidden = [_n_hidden]
+    def __init__(self, hidden_layers):
+        self.hidden_layers = hidden_layers
 
     def set(self, controller, n_inputs):
-        if self.n_hidden[0] > 0:
-            self.bias1 = controller[:self.n_hidden[0]].reshape(1, self.n_hidden[0])
-            weights1_slice = n_inputs * self.n_hidden[0] + self.n_hidden[0]
-            self.weights1 = controller[self.n_hidden[0]:weights1_slice].reshape((n_inputs, self.n_hidden[0]))
-            self.bias2 = controller[weights1_slice:weights1_slice + 3].reshape(1, 3)
-            self.weights2 = controller[weights1_slice + 3:].reshape((self.n_hidden[0], 3))
+        offset = 0
+        
+        
+        if self.hidden_layers[0] > 0:
+            self.bias1 = controller[offset:offset + self.hidden_layers[0]].reshape(1, self.hidden_layers[0])
+            offset += self.hidden_layers[0]
+            self.weights1 = controller[offset:offset + n_inputs * self.hidden_layers[0]].reshape((n_inputs, self.hidden_layers[0]))
+            offset += n_inputs * self.hidden_layers[0]
+        
+        
+        if len(self.hidden_layers) > 1 and self.hidden_layers[1] > 0:
+            self.bias2 = controller[offset:offset + self.hidden_layers[1]].reshape(1, self.hidden_layers[1])
+            offset += self.hidden_layers[1]
+            self.weights2 = controller[offset:offset + self.hidden_layers[0] * self.hidden_layers[1]].reshape((self.hidden_layers[0], self.hidden_layers[1]))
+            offset += self.hidden_layers[0] * self.hidden_layers[1]
+        
+        
+        self.bias_output = controller[offset:offset + 3].reshape(1, 3)
+        offset += 3
+        self.weights_output = controller[offset:].reshape((self.hidden_layers[-1], 3))
 
     def control(self, inputs, controller):
         inputs = np.array(inputs)
-        input_min = min(inputs)
-        input_max = max(inputs)
-
-        if self.n_hidden[0] > 0:
+        
+        if self.hidden_layers[0] > 0:
             output1 = relu_activation(inputs.dot(self.weights1) + self.bias1)
-            output = softmax_activation(output1.dot(self.weights2) + self.bias2)[0]
+            if len(self.hidden_layers) > 1 and self.hidden_layers[1] > 0:
+                output2 = relu_activation(output1.dot(self.weights2) + self.bias2)
+                output = softmax_activation(output2.dot(self.weights_output) + self.bias_output)[0]
+            else:
+                output = softmax_activation(output1.dot(self.weights_output) + self.bias_output)[0]
         else:
             bias = controller[:3].reshape(1, 3)
             weights = controller[3:].reshape((len(inputs), 3))
@@ -48,6 +64,7 @@ class robot_controller:
             return 'turn_right'
         else:
             return 'move_forward'
+        
 
 def relu_activation(x):
     return np.maximum(0, x)
@@ -80,7 +97,7 @@ def read_irs_sensors(rob, num_reads=7):
         "FrontRR": sensor_modes["FrontRR"],
         "FrontLL": sensor_modes["FrontLL"]
     }
-    print(front_sensors)
+    
     return front_sensors
 
 def move_forward(rob, speed, duration):
@@ -103,10 +120,10 @@ def fitness(individual, rob, start_position, start_orientation, target_position,
     collisions = 0
     distance_to_target = float('inf')
 
-    threshold = 250  # threshold for collisions
+    threshold = 250  
 
     previous_positions = []
-    stuck_threshold = 5  # Number of steps to consider the robot stuck
+    stuck_threshold = 5  
 
     for step in range(steps):
         sensor_dict = read_irs_sensors(rob)
@@ -129,18 +146,18 @@ def fitness(individual, rob, start_position, start_orientation, target_position,
         current_position = rob.get_position()
         previous_positions.append(current_position)
 
-        # Keep the list size to stuck_threshold
+        
         if len(previous_positions) > stuck_threshold:
             previous_positions.pop(0)
 
         if len(previous_positions) == stuck_threshold:
-            # Calculate the average movement over the last few steps
-            average_movement = sum(math.sqrt((previous_positions[i].x - previous_positions[i-1].x) ** 2 +(previous_positions[i].y - previous_positions[i-1].y) ** 2)for i in range(1, stuck_threshold)) / (stuck_threshold - 1)
-            # print('average_movement',average_movement)
             
-            if average_movement < 0.07:  # If the robot is moving less than 1 unit on average, consider it stuck
-                collisions += 2  # Penalize for being stuck
-                # Reset previous_positions to current position only to avoid continuous penalty
+            average_movement = sum(math.sqrt((previous_positions[i].x - previous_positions[i-1].x) ** 2 +(previous_positions[i].y - previous_positions[i-1].y) ** 2)for i in range(1, stuck_threshold)) / (stuck_threshold - 1)
+            
+            
+            if average_movement < 0.07:  
+                collisions += 2  
+                
                 previous_positions = [current_position]
 
         distance_to_target = math.sqrt((current_position.x - target_position.x) ** 2 +
@@ -157,9 +174,9 @@ def tournament_selection(population, fitnesses, num_parents, tournament_size=5):
     selected_parents = []
     for _ in range(num_parents):
         tournament = random.sample(list(zip(population, fitnesses)), tournament_size)
-        tournament.sort(key=lambda x: abs(x[1]), reverse=False)  # Sort by absolute fitness to find the closest to zero
+        tournament.sort(key=lambda x: abs(x[1]), reverse=False)  
         selected_parents.append(tournament[0][0])
-    # print("selected_parents",selected_parents)
+    
     return selected_parents
 
 def crossover(parent1, parent2):
@@ -176,7 +193,7 @@ def mutate(individual, mutation_rate=0.5):
 
 def save_checkpoint_jsonl(population, fitnesses, best_individual, generation, filename):
     try:
-        best_fitness = min(fitnesses, key=lambda x: abs(x))  # Find the fitness closest to zero
+        best_fitness = min(fitnesses, key=lambda x: abs(x))  
         checkpoint = {
             'generation': generation,
             'fitnesses': fitnesses,
@@ -208,7 +225,7 @@ def load_checkpoint_jsonl(filename):
         return None
 
 checkpoint_path = str(RESULT_DIR / "checkpoint.jsonl")
-n_hidden = 2
+n_hidden_layers = [32, 16] 
 n_inputs = 5
 n_outputs = 3
 
@@ -217,9 +234,10 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
                            checkpoint_file=checkpoint_path, continue_from_checkpoint=True,
                            steps=20):
 
-    n_weights = n_inputs * n_hidden + n_hidden * n_outputs + n_hidden + n_outputs
+    n_weights = n_inputs * n_hidden_layers[0] + n_hidden_layers[0] + n_hidden_layers[0] * n_hidden_layers[1] + n_hidden_layers[1] + n_hidden_layers[1] * n_outputs  + n_outputs 
 
-    controller = robot_controller(n_hidden)
+
+    controller = robot_controller(n_hidden_layers)
     
     if continue_from_checkpoint:
         checkpoint = load_checkpoint_jsonl(checkpoint_file)
@@ -251,17 +269,18 @@ def evolutionary_algorithm(rob, start_position, start_orientation, target_positi
 
         population = new_population[:population_size - num_parents] + parents
 
-        best_individual_index = fitnesses.index(min(fitnesses, key=lambda x: abs(x)))  # Find the best individual closest to zero
+        best_individual_index = fitnesses.index(min(fitnesses, key=lambda x: abs(x)))  
         best_individual = population[best_individual_index]
         save_checkpoint_jsonl(population, fitnesses, best_individual, generation, checkpoint_file)
 
-        best_fitness = min(fitnesses, key=lambda x: abs(x))  # Find the best fitness closest to zero
+        best_fitness = min(fitnesses, key=lambda x: abs(x))  
         print(f"Generation {generation}: Best Fitness = {best_fitness}")
 
 
 
-##########
-# for test
+########
+# For testing
+
 
 def load_best_individual():
     try:
@@ -287,12 +306,16 @@ def load_best_individual():
         return None
 
 def test_best_individual(rob, start_position, start_orientation, target_position, steps=30):
-    controller = robot_controller(n_hidden)
+    controller = robot_controller(n_hidden_layers)
     best_individual = load_best_individual()
     controller.set(best_individual, n_inputs)
     collisions = 0
     sensor_data_per_step = []
     threshold = 250
+
+    
+    speed=50
+    duration=500
 
     for _ in range(steps):
         sensor_dict = read_irs_sensors(rob)
@@ -302,11 +325,15 @@ def test_best_individual(rob, start_position, start_orientation, target_position
         print('action', action)
 
         if action == "move_forward":
-            move_forward(rob, speed=50, duration=500)
+            move_forward(rob, speed, duration)
+            time.sleep(duration/1000)
+
         elif action == "turn_left":
-            turn_left(rob, speed=50, duration=500)
+            turn_left(rob, speed, duration)
+            time.sleep(duration/1000)
         elif action == "turn_right":
-            turn_right(rob, speed=50, duration=500)
+            turn_right(rob, speed, duration)
+            time.sleep(duration/1000)
 
         sensor_dict = read_irs_sensors(rob)
         if (sensor_dict["FrontC"] > threshold or

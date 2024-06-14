@@ -1,5 +1,7 @@
 # Ignore the envLearningMachine directory
 envLearningMachine/
+examples/full_project_setup/open_vs_code.py"
+examples/full_project_setup/catkin_ws/src/learning_machines/src/learning_machines/random_stuff.ipynb
 
 examples/coppelia_sim_tutorial/
 
