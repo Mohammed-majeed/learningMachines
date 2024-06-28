@@ -19,6 +19,7 @@ import json
 from learning_machines import task_0
 from learning_machines import task_1
 from learning_machines import task_1_v2
+from learning_machines import task_3
 
 
 def test_emotions(rob: IRobobo):
@@ -104,19 +105,17 @@ def test_hardware(rob: HardwareRobobo):
 
 
 
-def train_task_1(rob):
+# def train_task_1(rob):
+#     start_position = Position(x=0.0, y=0.0, z=0.09)  # Set the starting position
+#     start_orientation = Orientation(yaw=-175.00036138789557, pitch=-19.996487020842473, roll=4.820286812070959e-05)  # Set the starting orientation
+#     target_position = Position(x=-1, y=1.5, z=0.0)  # Set the target position
 
-    # start_position = Position(x=0.125, y=0.202, z=0.09)  # Set the starting position
+#     try:
+#         task_1_v2.evolutionary_algorithm(rob, start_position, start_orientation, target_position)
+#         print("Done training")
+#     finally:
+#         rob.stop_simulation()  # Stop the simulation when done
 
-    start_position = Position(x=0.0, y=0.0, z=0.09)  # Set the starting position
-    start_orientation = Orientation(yaw=-175.00036138789557, pitch=-19.996487020842473, roll=4.820286812070959e-05)  # Set the starting orientation
-    target_position = Position(x=-1, y=1.5, z=0.0)  # Set the target position
-
-    try:
-        task_1_v2.evolutionary_algorithm(rob, start_position, start_orientation, target_position)
-        print("Done training")
-    finally:
-        rob.stop_simulation()  # Stop the simulation when done
 
 
 sensor_data_sim_path = str(RESULT_DIR / "sensor_data_simulation_new.jsonl")
@@ -128,25 +127,42 @@ def save_sensor_data(sensor_data, filename):
             f.write(json.dumps(data) + '\n')
     print(f"Sensor data saved successfully to {filename}")
 
-def test_task_1(rob, sensor_data_path):
-    start_position = Position(x=0.0, y=0.0, z=0.09)  # Set the starting position
+# def test_task_1(rob, sensor_data_path):
+#     start_position = Position(x=0.0, y=0.0, z=0.09)  # Set the starting position
+#     start_orientation = Orientation(yaw=-175.00036138789557, pitch=-19.996487020842473, roll=4.820286812070959e-05)  # Set the starting orientation
+#     target_position = Position(x=-0.5, y=1, z=0.0)  # Set the target position
+#     sensor_data_per_step = task_1_v2.test_best_individual(rob, start_position, start_orientation, target_position)
+#     save_sensor_data(sensor_data_per_step, sensor_data_path)
+#     print("Done testing")
+
+
+
+
+def train_task_3(rob):
+    start_position = Position(x=-2.4, y=0.077, z=0.09)  # Set the starting position
     start_orientation = Orientation(yaw=-175.00036138789557, pitch=-19.996487020842473, roll=4.820286812070959e-05)  # Set the starting orientation
-    target_position = Position(x=-0.5, y=1, z=0.0)  # Set the target position
+    target_position = Position(x=-3.500, y=1.175, z=0.002)  # Set the target position
 
-    sensor_data_per_step = task_1_v2.test_best_individual(rob, start_position, start_orientation, target_position)
-    save_sensor_data(sensor_data_per_step, sensor_data_path)
+    try:
+        task_3.evolutionary_algorithm(rob, start_position, start_orientation, target_position)
+        print("Done training")
+    finally:
+        rob.stop_simulation()  # Stop the simulation when done
 
+
+def test_task_3(rob, sensor_data_path):
+    start_position = Position(x=-2.4, y=0.077, z=0.09)  # Set the starting position
+    start_orientation = Orientation(yaw=-175.00036138789557, pitch=-19.996487020842473, roll=4.820286812070959e-05)  # Set the starting orientation
+    target_position = Position(x=-3.500, y=1.175, z=0.002)  # Set the target position
+    sensor_data_per_step = task_3.test_best_individual(rob, start_position, start_orientation, target_position)
+    # save_sensor_data(sensor_data_per_step, sensor_data_path)
     print("Done testing")
-
-
-
 
 def run_all_actions(rob: IRobobo):
     if isinstance(rob, SimulationRobobo):
-        rob.play_simulation()
-        
-        # train_task_1(rob)
-        test_task_1(rob,sensor_data_sim_path)
+        rob.play_simulation()        
+        train_task_3(rob)
+        # test_task_3(rob,sensor_data_sim_path)
 
     # task_0.avoid_obstacle(rob)
     # task_0.touch_wall_backup(rob)
@@ -162,7 +178,7 @@ def run_all_actions(rob: IRobobo):
     if isinstance(rob, HardwareRobobo):
         test_hardware(rob)
 
-        test_task_1(rob,sensor_data_hardware_path)
+        # test_task_1(rob,sensor_data_hardware_path)
 
     # test_phone_movement(rob)
 
